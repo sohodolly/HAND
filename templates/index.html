@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAND Weather Analytics</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:wght@300;400;500;600&display=swap');
+        :root {
+            --space-blue: #0a1128;
+            --deep-space: #051026;
+            --cosmic-purple: #1a237e;
+            --nebula-blue: #283593;
+            --electric-blue: #2962ff;
+            --plasma-pink: #d500f9;
+            --neon-cyan: #00e5ff;
+            --star-white: #e0f7fa;
+            --warning-orange: #ff6d00;
+            --success-green: #00c853;
+        }
+        body {
+            font-family: 'Exo 2', sans-serif;
+            background: linear-gradient(135deg, var(--deep-space) 0%, var(--space-blue) 50%, var(--cosmic-purple) 100%);
+            color: var(--star-white);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: -2;
+        }
+        .stars::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                radial-gradient(2px 2px at 40px 70px, #fff, transparent),
+                radial-gradient(1px 1px at 90px 40px, #ddd, transparent),
+                radial-gradient(1px 1px at 130px 80px, #fff, transparent),
+                radial-gradient(2px 2px at 160px 30px, #eee, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: starsMove 60s linear infinite;
+        }
+        @keyframes starsMove {
+            from { transform: translateX(0); }
+            to { transform: translateX(-200px); }
+        }
+        header {
+            padding: 2rem 0;
+            background: rgba(10, 17, 40, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(41, 98, 255, 0.3);
+        }
+        .header-content {
+            text-align: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .nasa-logo {
+            font-size: 2.5rem;
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(5deg); }
+        }
+        .logo h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.2rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, var(--star-white), var(--neon-cyan), var(--electric-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(41, 98, 255, 0.2);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 229, 255, 0.4);
+        }
+        .card-header h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.4rem;
+            color: var(--neon-cyan);
+            margin-bottom: 1.5rem;
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        /* WScore Display Styles */
+        .wscore-display {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(41, 98, 255, 0.15));
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .wscore-value {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .wscore-value span:first-child {
+            font-size: 4rem;
+            font-weight: 800;
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(45deg, #00ffcc, #00e5ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .wscore-unit {
+            font-size: 2rem;
+            color: var(--neon-cyan);
+        }
+        .wscore-explanation {
+            background: rgba(0, 229, 255, 0.1);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+        .wscore-levels {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .wscore-level {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .wscore-level-1 { border-left: 4px solid #00c853; }
+        .wscore-level-2 { border-left: 4px solid #64dd17; }
+        .wscore-level-3 { border-left: 4px solid #ffd600; }
+        .wscore-level-4 { border-left: 4px solid #ff9100; }
+        .wscore-level-5 { border-left: 4px solid #ff3d00; }
+
+        @media (max-width: 1024px) {
+            .wscore-levels {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.8rem;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.85rem;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(41, 98, 255, 0.3);
+            border-radius: 12px;
+            color: var(--star-white);
+            font-family: 'Exo 2', sans-serif;
+            font-size: 1rem;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 25px rgba(0, 229, 255, 0.4);
+        }
+        .coords-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .analyze-btn {
+            width: 100%;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--electric-blue), var(--plasma-pink));
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-family: 'Orbitron', monospace;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 1rem;
+        }
+        .analyze-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(213, 0, 249, 0.5);
+        }
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .processing {
+            text-align: center;
+            padding: 3rem 2rem;
+        }
+        .scan-animation {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 2rem;
+        }
+        .satellite {
+            font-size: 4rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: orbit 4s linear infinite;
+        }
+        @keyframes orbit {
+            0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+            50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.1); }
+            100% { transform: translate(-50%, -50%) rotate(360deg) scale(1); }
+        }
+        .results-content {
+            display: none;
+            animation: fadeInUp 0.8s ease-out;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .main-metric {
+            background: linear-gradient(135deg, rgba(41, 98, 255, 0.15), rgba(213, 0, 249, 0.15));
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .temp-value {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .temp-value span:first-child {
+            font-size: 4.5rem;
+            font-weight: 800;
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(45deg, #ffffff, var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .temp-unit {
+            font-size: 2.2rem;
+            color: var(--neon-cyan);
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, rgba(41, 98, 255, 0.1), rgba(2, 103, 115, 0.1));
+            border: 1px solid rgba(41, 98, 255, 0.25);
+            border-radius: 16px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            transition: all 0.4s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 229, 255, 0.4);
+        }
+        .metric-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: 'Orbitron', monospace;
+            color: var(--neon-cyan);
+            margin-bottom: 0.8rem;
+        }
+        .metric-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        .summary-card {
+            background: linear-gradient(135deg, rgba(213, 0, 249, 0.1), rgba(41, 98, 255, 0.1));
+            border: 1px solid rgba(213, 0, 249, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+        }
+        .summary-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--plasma-pink);
+        }
+        .console-output {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ffcc;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 2rem;
+            font-family: 'Courier New', monospace;
+            color: #00ffcc;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        /* Map styles */
+        #map {
+            height: 300px;
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid rgba(41, 98, 255, 0.3);
+            margin-bottom: 1rem;
+        }
+        .leaflet-container {
+            background: rgba(10, 17, 40, 0.9) !important;
+        }
+        .leaflet-popup-content {
+            color: #333;
+        }
+        .map-instructions {
+            text-align: center;
+            margin-bottom: 1rem;
+            color: var(--neon-cyan);
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars"></div>
+    
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <div class="nasa-logo">🚀</div>
+                <h1>HAND WEATHER ANALYTICS</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="card input-card">
+            <div class="card-header">
+                <h2>🌍 WEATHER ANALYSIS</h2>
+            </div>
+            
+            <form id="weatherForm" onsubmit="analyzeWeather(event)">
+                <div class="input-group">
+                    <label for="region">REGION NAME</label>
+                    <input type="text" id="region" name="region" value="Kyiv, Ukraine" required>
+                </div>
+
+                <div class="input-group">
+                    <label>SELECT LOCATION ON MAP</label>
+                    <div class="map-instructions">Click on the map to select coordinates</div>
+                    <div id="map"></div>
+                </div>
+
+                <div class="coords-grid">
+                    <div class="input-group">
+                        <label for="lat">LATITUDE (°N)</label>
+                        <input type="number" id="lat" name="lat" step="0.0001" value="50.4500" required readonly>
+                    </div>
+                    <div class="input-group">
+                        <label for="lon">LONGITUDE (°E)</label>
+                        <input type="number" id="lon" name="lon" step="0.0001" value="30.5233" required readonly>
+                    </div>
+                </div>
+
+                <div class="coords-grid">
+                    <div class="input-group">
+                        <label for="target_date">TARGET DATE</label>
+                        <input type="date" id="target_date" name="target_date" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="end_date">END DATE</label>
+                        <input type="date" id="end_date" name="end_date">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="start_date">START DATE</label>
+                    <input type="date" id="start_date" value="2020-01-01">
+                </div>
+
+                <button type="submit" class="analyze-btn">
+                    📊 GET FORECAST
+                </button>
+            </form>
+        </div>
+
+        <div class="card result-card">
+            <!-- WScore Display -->
+            <div class="wscore-display">
+                <div class="wscore-value">
+                    <span id="wscore">0</span>
+                    <span class="wscore-unit">/5</span>
+                </div>
+                <div id="comfort-desc" style="margin-top: 1rem; font-size: 1.2rem; opacity: 0.9;">
+                    Weather Comfort Score
+                </div>
+                
+                <!-- WScore Explanation -->
+                <div class="wscore-explanation">
+                    <h3 style="color: var(--neon-cyan); margin-bottom: 1rem;">🌤️ WSCORE EXPLANATION</h3>
+                    <p style="margin-bottom: 1rem; opacity: 0.9;">
+                        WScore measures weather comfort from 1 (excellent) to 5 (critical). 
+                        It considers temperature, humidity, wind, and precipitation.
+                    </p>
+                    <div class="wscore-levels">
+                        <div class="wscore-level wscore-level-1">
+                            <div style="font-size: 1.5rem; font-weight: bold;">1</div>
+                            <div style="font-size: 0.8rem; margin-top: 0.5rem;">EXCELLENT</div>
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem;">Perfect conditions</div>
+                        </div>
+                        <div class="wscore-level wscore-level-2">
+                            <div style="font-size: 1.5rem; font-weight: bold;">2</div>
+                            <div style="font-size: 0.8rem; margin-top: 0.5rem;">GOOD</div>
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem;">Comfortable</div>
+                        </div>
+                        <div class="wscore-level wscore-level-3">
+                            <div style="font-size: 1.5rem; font-weight: bold;">3</div>
+                            <div style="font-size: 0.8rem; margin-top: 0.5rem;">MODERATE</div>
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem;">Average comfort</div>
+                        </div>
+                        <div class="wscore-level wscore-level-4">
+                            <div style="font-size: 1.5rem; font-weight: bold;">4</div>
+                            <div style="font-size: 0.8rem; margin-top: 0.5rem;">UNCOMFORTABLE</div>
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem;">Challenging</div>
+                        </div>
+                        <div class="wscore-level wscore-level-5">
+                            <div style="font-size: 1.5rem; font-weight: bold;">5</div>
+                            <div style="font-size: 0.8rem; margin-top: 0.5rem;">CRITICAL</div>
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem;">Extreme conditions</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Specific Conditions -->
+            <div id="specific-conditions" class="summary-card" style="display: none; margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem; color: var(--neon-cyan);">SPECIFIC CONDITIONS</h3>
+                <div id="conditions-list"></div>
+            </div>
+
+            <div class="processing" id="processing">
+                <div class="scan-animation">
+                    <div class="satellite">🛰️</div>
+                </div>
+                <h2>SATELLITE DATA PROCESSING</h2>
+                <p>Collecting real-time meteorological information...</p>
+            </div>
+
+            <div class="results-content" id="resultsContent">
+                <div class="main-metric">
+                    <div class="temp-value">
+                        <span id="temp">0</span>
+                        <span class="temp-unit">°C</span>
+                    </div>
+                    <div style="margin-top: 1rem; opacity: 0.9;">Average Temperature</div>
+                </div>
+
+                <div class="summary-card">
+                    <div style="margin-bottom: 0.5rem; opacity: 0.9;">Peak Temperature:</div>
+                    <div class="summary-value" id="max-temp">0°C</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Map initialization
+        let map;
+        let marker;
+        
+        function initMap() {
+            // Create map centered on Ukraine
+            map = L.map('map').setView([50.4500, 30.5233], 6);
+            
+            // Add tiles (map layer)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+            
+            marker = L.marker([50.4500, 30.5233]).addTo(map)
+                .bindPopup('Kyiv, Ukraine')
+                .openPopup();
+            
+            map.on('click', function(e) {
+                const lat = parseFloat(e.latlng.lat.toFixed(1));
+                const lng = parseFloat(e.latlng.lng.toFixed(1));
+                
+                marker.setLatLng([lat, lng]);
+                
+                document.getElementById('lat').value = lat.toFixed(4);
+                document.getElementById('lon').value = lng.toFixed(4);
+                
+                marker.bindPopup(`Lat: ${lat.toFixed(4)}°<br>Lon: ${lng.toFixed(4)}°`).openPopup();
+                
+                updateRegionName(lat, lng);
+            });
+        }
+        
+        async function updateRegionName(lat, lng) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                const data = await response.json();
+                
+                if (data && data.address) {
+                    const address = data.address;
+                    let regionName = '';
+                    
+                    if (address.city) {
+                        regionName = address.city;
+                    } else if (address.town) {
+                        regionName = address.town;
+                    } else if (address.village) {
+                        regionName = address.village;
+                    } else if (address.municipality) {
+                        regionName = address.municipality;
+                    }
+                    
+                    if (address.country) {
+                        regionName += regionName ? `, ${address.country}` : address.country;
+                    }
+                    
+                    if (regionName) {
+                        document.getElementById('region').value = regionName;
+                    }
+                }
+            } catch (error) {
+                console.log('Failed to get region name:', error);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('target_date').value = tomorrow.toISOString().split('T')[0];
+            
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('end_date').value = today;
+            
+            hideProcessing();
+            hideResults();
+        });
+
+        async function analyzeWeather(event) {
+            event.preventDefault();
+            
+            const formData = {
+                lat: document.getElementById('lat').value,
+                lon: document.getElementById('lon').value,
+                lat_min: (parseFloat(document.getElementById('lat').value) - 0.5).toFixed(4),
+                lat_max: (parseFloat(document.getElementById('lat').value) + 0.5).toFixed(4),
+                lon_min: (parseFloat(document.getElementById('lon').value) - 0.5).toFixed(4),
+                lon_max: (parseFloat(document.getElementById('lon').value) + 0.5).toFixed(4),
+                target_date: document.getElementById('target_date').value,
+                region: document.getElementById('region').value,
+                start_date: document.getElementById('start_date').value,
+                end_date: document.getElementById('end_date').value
+            };
+
+            const button = document.querySelector('.analyze-btn');
+            button.disabled = true;
+            button.textContent = 'PROCESSING...';
+            
+            showProcessing();
+            hideResults();
+
+            try {
+                const response = await fetch('/api/forecast', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                hideProcessing();
+
+                if (data.success) {
+                    showResults();
+                    
+                    if (data.data) {
+                        const forecast = data.data;
+                        
+                        if (forecast.wscore !== undefined) {
+                            animateValue('wscore', 0, forecast.wscore, 1500);
+                            document.getElementById('comfort-desc').textContent = forecast.comfort_description || 'Weather Comfort Score';
+                                updateSpecificConditions(forecast);
+                        }
+                        
+                        if (forecast.temperature !== undefined) {
+                            animateValue('temp', 0, forecast.temperature, 1200);
+                        }
+                        
+                        if (forecast.humidity !== undefined) {
+                            animateValue('humidity', 0, forecast.humidity, 1200);
+                        }
+                        if (forecast.wind_speed !== undefined) {
+                            animateValue('wind-speed', 0, forecast.wind_speed, 1200);
+                        }
+                        if (forecast.precipitation !== undefined) {
+                            animateValue('precipitation', 0, forecast.precipitation, 1200);
+                        }
+                        if (forecast.max_temp !== undefined) {
+                            setTimeout(() => {
+                                document.getElementById('max-temp').textContent = forecast.max_temp.toFixed(1) + '°C';
+                            }, 1000);
+                        }
+                        
+                        updateSpecificConditions(forecast);
+                        
+                        displayDetailedInfo(forecast);
+                    }
+                    
+                    displayConsoleOutput(data.console_output);
+                } else {
+                    alert('Error: ' + data.error);
+                    if (data.console_output) {
+                        displayConsoleOutput(data.console_output);
+                    }
+                }
+            } catch (error) {
+                hideProcessing();
+                alert('Network error: ' + error);
+            } finally {
+                button.disabled = false;
+                button.textContent = '📊 GET FORECAST';
+            }
+        }
+
+        function showProcessing() {
+            document.getElementById("processing").style.display = "block";
+        }
+
+        function hideProcessing() {
+            document.getElementById("processing").style.display = "none";
+        }
+
+        function showResults() {
+            document.getElementById("resultsContent").style.display = "block";
+        }
+
+        function hideResults() {
+            document.getElementById("resultsContent").style.display = "none";
+        }
+
+        function displayConsoleOutput(output) {
+            const resultsContent = document.querySelector('.results-content');
+            if (!resultsContent) return;
+            
+            let consoleOutput = document.getElementById('consoleOutput');
+            if (consoleOutput) {
+                consoleOutput.remove();
+            }
+            
+            consoleOutput = document.createElement('div');
+            consoleOutput.id = 'consoleOutput';
+            consoleOutput.className = 'console-output';
+            consoleOutput.innerHTML = `
+                <h3 style="font-family: 'Orbitron', monospace; color: #00ffcc; margin-bottom: 1rem;">📟 CONSOLE OUTPUT</h3>
+                <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">${output || 'No output'}</pre>
+            `;
+            
+            resultsContent.appendChild(consoleOutput);
+        }
+
+        function displayDetailedInfo(forecast) {
+            const resultsContent = document.querySelector('.results-content');
+            if (!resultsContent) return;
+            
+            let detailsDiv = document.getElementById('detailedInfo');
+            if (detailsDiv) {
+                detailsDiv.remove();
+            }
+            
+            detailsDiv = document.createElement('div');
+            detailsDiv.id = 'detailedInfo';
+            detailsDiv.style.cssText = `
+                background: rgba(0, 229, 255, 0.1);
+                border: 1px solid rgba(0, 229, 255, 0.3);
+                border-radius: 12px;
+                padding: 1.5rem;
+                margin-top: 2rem;
+                font-family: 'Exo 2', sans-serif;
+            `;
+            
+            detailsDiv.innerHTML = `
+                <h3 style="font-family: 'Orbitron', monospace; color: #00ffcc; margin-bottom: 1rem;">📈 DETAILED INFORMATION</h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                    <div>🌡️ Temperature: <strong>${forecast.temperature}°C</strong></div>
+                    <div>🔥 Heat index: <strong>${forecast.hot_perc}%</strong></div>
+                    <div>❄️ Cold index: <strong>${forecast.cool_perc}%</strong></div>
+                    <div>💨 Wind: <strong>${forecast.wind_speed} m/s (${forecast.wind_speed_kmh || (forecast.wind_speed * 3.6).toFixed(1)} km/h)</strong></div>
+                    <div>💨 Wind index: <strong>${forecast.wind_perc}%</strong></div>
+                    <div>💧 Humidity: <strong>${forecast.humidity}%</strong></div>
+                    <div>💧 Humidity index: <strong>${forecast.humid_perc}%</strong></div>
+                    <div>🌧️ Precipitation: <strong>${forecast.precipitation} mm/day</strong></div>
+                ${forecast.wscore !== undefined ? `
+                    <div>🎯 WScore: <strong>${forecast.wscore}/5</strong></div>
+                    <div>📊 Comfort: <strong>${forecast.comfort_description || 'Not specified'}</strong></div>
+                ` : ''}
+                </div>
+            `;
+            
+            const consoleOutput = document.getElementById('consoleOutput');
+            if (consoleOutput) {
+                resultsContent.insertBefore(detailsDiv, consoleOutput);
+            } else {
+                resultsContent.appendChild(detailsDiv);
+            }
+        }
+
+        function animateValue(id, start, end, duration) {
+            const element = document.getElementById(id);
+            if (!element) return;
+            
+            const range = end - start;
+            const startTime = performance.now();
+            
+            function updateValue(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const value = start + (range * progress);
+                
+                element.textContent = value.toFixed(1);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateValue);
+                }
+            }
+            
+            requestAnimationFrame(updateValue);
+        }
+
+       function updateSpecificConditions(forecast) {
+    const conditionsContainer = document.getElementById('specific-conditions');
+    const conditionsList = document.getElementById('conditions-list');
+    
+    if (forecast.specific_conditions && forecast.specific_conditions.trim() !== '') {
+        conditionsContainer.style.display = 'block';
+        
+        const conditions = forecast.specific_conditions.split('; ').filter(condition => condition.trim() !== '');
+        
+        if (conditions.length > 0) {
+            conditionsList.innerHTML = conditions.map(condition => 
+                `<div style="margin: 0.5rem 0; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 8px; font-size: 0.9rem;">
+                    ${condition}
+                </div>`
+            ).join('');
+        } else {
+            conditionsList.innerHTML = '<div style="opacity: 0.7; text-align: center; padding: 1rem;">No specific conditions detected</div>';
+            conditionsContainer.style.display = 'none';
+        }
+    } 
+    else if (forecast.wscore !== undefined) {
+        conditionsContainer.style.display = 'block';
+        
+        let conditions = [];
+        const temp = forecast.temperature || 0;
+        const wind = forecast.wind_speed || 0;
+        const precip = forecast.precipitation || 0;
+        
+        // Temperature conditions
+        if (temp > 35) conditions.push("🔥 VERY HOT conditions");
+        else if (temp > 30) conditions.push("🌡️ Hot conditions");
+        else if (temp < -10) conditions.push("❄️ VERY COLD conditions");
+        else if (temp < -5) conditions.push("🥶 Cold conditions");
+        else if (temp < 0) conditions.push("❄️ Frost conditions");
+        
+        // Wind conditions
+        if (wind > 15) conditions.push("💨 VERY WINDY conditions");
+        else if (wind > 10) conditions.push("💨 Windy conditions");
+        else if (wind > 7) conditions.push("💨 Moderate wind conditions");
+        
+        // Precipitation conditions
+        if (precip > 50) conditions.push("🌧️ Heavy precipitation");
+        else if (precip > 20) conditions.push("🌧️ Moderate precipitation");
+        else if (precip > 5) conditions.push("🌧️ Light precipitation");
+        else if (precip === 0) conditions.push("☀️ No precipitation");
+        
+        // Додаткові умови на основі WScore
+        if (forecast.wscore >= 4) {
+            conditions.push("⚠️ Uncomfortable weather conditions");
+        } else if (forecast.wscore <= 2) {
+            conditions.push("✅ Comfortable weather conditions");
+        }
+        
+        if (conditions.length > 0) {
+            conditionsList.innerHTML = conditions.map(condition => 
+                `<div style="margin: 0.5rem 0; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 8px; font-size: 0.9rem;">
+                    ${condition}
+                </div>`
+            ).join('');
+        } else {
+            conditionsList.innerHTML = '<div style="opacity: 0.7; text-align: center; padding: 1rem;">No specific weather conditions detected</div>';
+            conditionsContainer.style.display = 'none';
+        }
+    } else {
+        conditionsContainer.style.display = 'none';
+        conditionsList.innerHTML = '';
+    }
+    
+    // Додаємо анімацію появи
+    if (conditionsContainer.style.display === 'block') {
+        conditionsContainer.style.animation = 'fadeInUp 0.6s ease-out';
+    }
+}
+    </script>
+</body>
+</html>
